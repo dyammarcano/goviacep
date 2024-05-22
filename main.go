@@ -6,14 +6,21 @@ import (
 	"fmt"
 	"github.com/dyammarcano/dataprovider"
 	"log"
-	"time"
+	"runtime/debug"
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			debug.PrintStack()
+			log.Println("Recovered in main() func", r)
+		}
+	}()
+
 	// Create a config with driver name to initialize the data provider
 	cfg := dataprovider.NewConfigModule().
 		WithDriver(dataprovider.SQLiteDataProviderName).
-		WithName("database").
+		WithName("database3").
 		Build()
 
 	provider, err := dataprovider.NewDataProvider(cfg)
@@ -26,6 +33,7 @@ func main() {
 	}
 
 	conn := provider.GetConnection()
+	defer conn.Close()
 
 	var (
 		value   string
@@ -49,6 +57,11 @@ func main() {
 		counter = onlyDigits(viaCEP.Cep)
 	}
 
+	tx, err := conn.Beginx()
+	if err != nil {
+		panic(err)
+	}
+
 	for {
 		// Convert the integer back to a string with leading zeros
 		value = fmt.Sprintf("%08d", counter)
@@ -59,21 +72,31 @@ func main() {
 			panic(err)
 		}
 
-		if _, err = conn.Exec(viaCEP.add()); err != nil {
+		if _, err = tx.Exec(viaCEP.add()); err != nil {
 			panic(err)
+		}
+
+		if (counter+1)%1000 == 0 {
+			if err = tx.Commit(); err != nil {
+				panic(err)
+			}
+
+			tx, err = conn.Beginx()
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		if value == end {
 			break
 		}
 
-		if counter%1000 == 0 {
-			log.Println("Waiting 30 minutes to continue")
-			<-time.After(30 * time.Minute)
-		}
-
 		// Increment the counter
 		counter++
+	}
+
+	if err = tx.Commit(); err != nil {
+		panic(err)
 	}
 }
 

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"github.com/oklog/ulid/v2"
+	"math/rand"
 	"time"
 )
 
@@ -16,8 +16,8 @@ const (
 )
 
 const (
-	createTableViaCEP = `CREATE TABLE IF NOT EXISTS viacep (id INTEGER PRIMARY KEY AUTOINCREMENT,cep TEXT NOT NULL,logradouro TEXT NOT NULL,complemento TEXT NOT NULL,bairro TEXT NOT NULL,localidade TEXT NOT NULL,uf TEXT NOT NULL,ibge TEXT NOT NULL,gia TEXT NOT NULL,ddd TEXT NOT NULL,siafi TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,valid BOOLEAN NOT NULL DEFAULT 0);`
-	insertViaCEP      = `INSERT INTO viacep (cep,logradouro,complemento,bairro,localidade,uf,ibge,gia,ddd,siafi,created_at,updated_at,valid) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%v');`
+	createTableViaCEP = `CREATE TABLE IF NOT EXISTS viacep (id INTEGER PRIMARY KEY AUTOINCREMENT,cep TEXT NOT NULL,logradouro TEXT NOT NULL,complemento TEXT NOT NULL,bairro TEXT NOT NULL,localidade TEXT NOT NULL,uf TEXT NOT NULL,ibge TEXT NOT NULL,gia TEXT NOT NULL,ddd TEXT NOT NULL,siafi TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,valid BOOLEAN NOT NULL DEFAULT 0,uid TEXT NOT NULL);`
+	insertViaCEP      = `INSERT INTO viacep (cep,logradouro,complemento,bairro,localidade,uf,ibge,gia,ddd,siafi,created_at,updated_at,valid,uid) VALUES ('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%v','%s');`
 	selectViaCEP      = `SELECT * FROM viacep;`
 	updateViaCEP      = `UPDATE viacep SET logradouro = '%s',complemento = '%s',bairro = '%s',localidade = '%s',uf = '%s',ibge = '%s',gia = '%s',ddd = '%s',siafi = '%s',updated_at = '%s' WHERE cep = '%s';`
 	deleteViaCEP      = `DELETE FROM viacep WHERE cep = '%s';`
@@ -102,19 +102,35 @@ type ViaCEP struct {
 	UpdatedAt   string `json:"updated_at" db:"updated_at"`
 	Error       bool   `json:"erro"`
 	Valid       bool   `json:"valid" db:"valid"`
+	Ulid        string `json:"uid" db:"uid"`
 }
 
 func requestViaCEP(cep string) (*ViaCEP, error) {
-	req, err := http.Get(fmt.Sprintf(string(ViaCEPUrl), cep))
-	if err != nil {
-		return nil, err
-	}
-	defer req.Body.Close()
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	//
+	//client := &http.Client{
+	//	Timeout: 10 * time.Second,
+	//}
+	//
+	//req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf(string(ViaCEPUrl), cep), nil)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//defer req.Body.Close()
+	//
+	//resp, err := client.Do(req)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//defer resp.Body.Close()
 
-	viaCEP := &ViaCEP{}
-	if err = json.NewDecoder(req.Body).Decode(viaCEP); err != nil {
-		return nil, err
-	}
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+
+	viaCEP := &ViaCEP{Ulid: ulid.MustNew(ulid.Now(), entropy).String()}
+	//if err = json.NewDecoder(resp.Body).Decode(viaCEP); err != nil {
+	//	return nil, err
+	//}
 
 	viaCEP.Cep = formatCep(cep)
 	viaCEP.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
@@ -124,7 +140,7 @@ func requestViaCEP(cep string) (*ViaCEP, error) {
 }
 
 func (v *ViaCEP) add() string {
-	return fmt.Sprintf(insertViaCEP, v.Cep, v.Logradouro, v.Complemento, v.Bairro, v.Localidade, v.Uf, v.Ibge, v.Gia, v.Ddd, v.Siafi, v.CreatedAt, v.UpdatedAt, checkAllFields(v))
+	return fmt.Sprintf(insertViaCEP, v.Cep, v.Logradouro, v.Complemento, v.Bairro, v.Localidade, v.Uf, v.Ibge, v.Gia, v.Ddd, v.Siafi, v.CreatedAt, v.UpdatedAt, checkAllFields(v), v.Ulid)
 }
 
 func (v *ViaCEP) update() string {

@@ -4,7 +4,10 @@ go 1.22.2
 
 toolchain go1.22.3
 
-require github.com/dyammarcano/dataprovider v0.0.2
+require (
+	github.com/dyammarcano/dataprovider v0.0.2
+	github.com/oklog/ulid/v2 v2.0.2
+)
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
