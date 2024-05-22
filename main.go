@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/dyammarcano/dataprovider"
+	bolt "go.etcd.io/bbolt"
 	"log"
 	"runtime/debug"
+	"sync"
 )
 
 func main() {
@@ -16,6 +19,15 @@ func main() {
 			log.Println("Recovered in main() func", r)
 		}
 	}()
+
+	wg := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := bolt.Open("cache.bolt", 0600, nil)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create a config with driver name to initialize the data provider
 	cfg := dataprovider.NewConfigModule().
@@ -41,6 +53,8 @@ func main() {
 		end     = "99999999"
 	)
 
+	store := NewStore(ctx, conn, db, &wg)
+
 	// query the last stored data to continue the request
 
 	viaCEP := &ViaCEP{}
@@ -57,11 +71,6 @@ func main() {
 		counter = onlyDigits(viaCEP.Cep)
 	}
 
-	tx, err := conn.Beginx()
-	if err != nil {
-		panic(err)
-	}
-
 	for {
 		// Convert the integer back to a string with leading zeros
 		value = fmt.Sprintf("%08d", counter)
@@ -71,21 +80,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-
-		if _, err = tx.Exec(viaCEP.add()); err != nil {
-			panic(err)
-		}
-
-		if (counter+1)%1000 == 0 {
-			if err = tx.Commit(); err != nil {
-				panic(err)
-			}
-
-			tx, err = conn.Beginx()
-			if err != nil {
-				panic(err)
-			}
-		}
+		_ = store.Insert(viaCEP)
 
 		if value == end {
 			break
@@ -95,9 +90,7 @@ func main() {
 		counter++
 	}
 
-	if err = tx.Commit(); err != nil {
-		panic(err)
-	}
+	wg.Wait()
 }
 
 func onlyDigits(s string) int {

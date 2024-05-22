@@ -6,7 +6,9 @@ toolchain go1.22.3
 
 require (
 	github.com/dyammarcano/dataprovider v0.0.2
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/oklog/ulid/v2 v2.0.2
+	go.etcd.io/bbolt v1.3.10
 )
 
 require (
@@ -18,7 +20,6 @@ require (
 	github.com/godror/knownpb v0.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
